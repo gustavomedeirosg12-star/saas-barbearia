@@ -97,8 +97,7 @@ function AuthWrapper({ children }: { children: React.ReactNode }) {
   const handleLogin = async () => {
     const provider = new GoogleAuthProvider();
     try {
-      // Usando Redirecionamento em vez de Popup para evitar bloqueios do Vercel/Navegador
-      await signInWithRedirect(auth, provider);
+      await signInWithPopup(auth, provider);
     } catch (error: any) {
       console.error("Login failed", error);
       alert(`Erro no login: ${error.message || error.code || JSON.stringify(error)}`);
