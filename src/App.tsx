@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, Component, ErrorInfo } from 'react';
 import { BrowserRouter, Routes, Route, useParams, useNavigate, Link } from 'react-router-dom';
 import { LayoutDashboard, Globe, Menu, X, Scissors, Plus, Trash2, Calendar as CalendarIcon, Check, LogOut, LogIn, Save, DollarSign, MessageSquare, CreditCard, BookOpen, QrCode, AlertCircle, ChevronLeft, ChevronRight } from 'lucide-react';
@@ -6,7 +5,7 @@ import { format, addDays, startOfWeek, endOfWeek, eachDayOfInterval, isSameDay, 
 import { ptBR } from 'date-fns/locale';
 import { QRCodeSVG } from 'qrcode.react';
 import { auth, db } from './firebase';
-import { signInWithPopup, GoogleAuthProvider, signOut, onAuthStateChanged, User } from 'firebase/auth';
+import { signInWithPopup, signInWithRedirect, GoogleAuthProvider, signOut, onAuthStateChanged, User } from 'firebase/auth';
 import { doc, setDoc, getDoc, onSnapshot, collection, query, where, addDoc, updateDoc, serverTimestamp } from 'firebase/firestore';
 
 // --- MAIN APP COMPONENT ---
@@ -98,9 +97,11 @@ function AuthWrapper({ children }: { children: React.ReactNode }) {
   const handleLogin = async () => {
     const provider = new GoogleAuthProvider();
     try {
-      await signInWithPopup(auth, provider);
-    } catch (error) {
+      // Usando Redirecionamento em vez de Popup para evitar bloqueios do Vercel/Navegador
+      await signInWithRedirect(auth, provider);
+    } catch (error: any) {
       console.error("Login failed", error);
+      alert(`Erro no login: ${error.message || error.code || JSON.stringify(error)}`);
     }
   };
 
