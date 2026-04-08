@@ -269,7 +269,7 @@ function Dashboard({ user }: { user?: User }) {
           <div className="pt-4 mt-4 border-t border-gray-100">
             <p className="px-4 text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Link para Clientes</p>
             <Link 
-              to={`/${slug || user?.uid}`} 
+              to={`/${user?.uid}`} 
               target="_blank"
               className="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium text-gray-600 hover:bg-indigo-50 hover:text-indigo-700 transition-colors border border-transparent hover:border-indigo-100"
             >
@@ -500,8 +500,9 @@ function SettingsTab({ user, shopName, setShopName, shopDescription, setShopDesc
       
       await setDoc(doc(db, 'barbershops', user.uid), { shopName, shopDescription, primaryColor, logoUrl, bannerUrl, slug: formattedSlug || user.uid, services }, { merge: true });
       alert("Configurações salvas!");
-    } catch (error) {
-      alert("Erro ao salvar.");
+    } catch (error: any) {
+      console.error("Error saving:", error);
+      alert(`Erro ao salvar: ${error.message}`);
     } finally {
       setIsSaving(false);
     }
@@ -534,12 +535,12 @@ function SettingsTab({ user, shopName, setShopName, shopDescription, setShopDesc
         <div className="flex flex-col sm:flex-row gap-2">
           <input 
             readOnly 
-            value={`${window.location.origin}/${slug || user.uid}`} 
+            value={`${window.location.origin}/${user.uid}`} 
             className="flex-1 border border-indigo-200 rounded-lg px-4 py-3 bg-white text-gray-700 font-medium outline-none" 
           />
           <button 
             onClick={() => {
-              navigator.clipboard.writeText(`${window.location.origin}/${slug || user.uid}`);
+              navigator.clipboard.writeText(`${window.location.origin}/${user.uid}`);
               alert("Link copiado! Agora é só colar no seu Instagram.");
             }}
             className="px-6 py-3 bg-indigo-600 text-white font-medium rounded-lg hover:bg-indigo-700 transition-colors whitespace-nowrap"
@@ -951,15 +952,9 @@ function PublicPage() {
             Não conseguimos encontrar nenhuma barbearia com o link:<br/>
             <strong className="text-gray-900 break-all">{shopId}</strong>
           </p>
-          <p className="text-sm text-gray-500 mb-4">
+          <p className="text-sm text-gray-500">
             Verifique se o link foi digitado corretamente ou se o barbeiro já configurou o endereço.
           </p>
-          
-          {/* DEBUG INFO - REMOVE LATER */}
-          <div className="mt-6 p-4 bg-gray-100 rounded-lg text-left text-xs overflow-auto max-h-40">
-            <p className="font-bold text-gray-700 mb-2">Debug Info (Slugs no Banco):</p>
-            <DebugSlugsList />
-          </div>
         </div>
       </div>
     );
