@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, Component, ErrorInfo } from 'react';
 import { BrowserRouter, Routes, Route, useParams, useNavigate, Link } from 'react-router-dom';
 import { LayoutDashboard, Globe, Menu, X, Scissors, Plus, Trash2, Calendar as CalendarIcon, Check, LogOut, LogIn, Save, DollarSign, MessageSquare, CreditCard, BookOpen, QrCode, AlertCircle, ChevronLeft, ChevronRight } from 'lucide-react';
