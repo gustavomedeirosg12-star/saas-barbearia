@@ -37,6 +37,10 @@ service cloud.firestore {
       return request.auth != null;
     }
 
+    function isServer() {
+      return isAuthenticated() && request.auth.token.email == 'webhook@barbersaas.com';
+    }
+
     function isOwner(userId) {
       return isAuthenticated() && request.auth.uid == userId;
     }
@@ -97,7 +101,7 @@ service cloud.firestore {
       
       // Only the owner can create or update their barbershop profile
       allow create: if isOwner(userId) && isValidBarbershop();
-      allow update: if isOwner(userId) && isValidBarbershop();
+      allow update: if (isOwner(userId) && isValidBarbershop()) || isServer();
     }
 
     match /appointments/{appointmentId} {

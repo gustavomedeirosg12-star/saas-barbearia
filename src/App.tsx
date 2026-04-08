@@ -8,53 +8,17 @@ import { auth, db } from './firebase';
 import { signInWithPopup, GoogleAuthProvider, signOut, onAuthStateChanged, User } from 'firebase/auth';
 import { doc, setDoc, getDoc, onSnapshot, collection, query, where, addDoc, updateDoc, serverTimestamp } from 'firebase/firestore';
 
-// --- ERROR BOUNDARY ---
-class ErrorBoundary extends Component<{ children: React.ReactNode }, { hasError: boolean, error: Error | null }> {
-  constructor(props: { children: React.ReactNode }) {
-    super(props);
-    this.state = { hasError: false, error: null };
-  }
-
-  static getDerivedStateFromError(error: Error) {
-    return { hasError: true, error };
-  }
-
-  componentDidCatch(error: Error, errorInfo: ErrorInfo) {
-    console.error("ErrorBoundary caught an error", error, errorInfo);
-  }
-
-  render() {
-    if (this.state.hasError) {
-      return (
-        <div className="min-h-screen flex items-center justify-center bg-gray-50 p-4">
-          <div className="bg-white p-8 rounded-2xl shadow-sm border border-red-200 max-w-md w-full text-center">
-            <AlertCircle className="w-12 h-12 text-red-500 mx-auto mb-4" />
-            <h1 className="text-xl font-bold text-gray-900 mb-2">Ops! Algo deu errado.</h1>
-            <p className="text-gray-600 mb-6 text-sm">Ocorreu um erro inesperado no aplicativo. Tente recarregar a página.</p>
-            <button onClick={() => window.location.reload()} className="px-6 py-3 bg-red-600 text-white font-medium rounded-xl hover:bg-red-700 transition-colors">
-              Recarregar Página
-            </button>
-          </div>
-        </div>
-      );
-    }
-    return this.props.children;
-  }
-}
-
 // --- MAIN APP COMPONENT ---
 export default function App() {
   return (
-    <ErrorBoundary>
-      <BrowserRouter>
-        <Routes>
+    <BrowserRouter>
+      <Routes>
           <Route path="/" element={<LandingPage />} />
           <Route path="/dashboard" element={<AuthWrapper><Dashboard /></AuthWrapper>} />
           <Route path="/:shopId" element={<PublicPage />} />
           <Route path="/agendamento/:appointmentId" element={<ClientAppointmentPage />} />
         </Routes>
       </BrowserRouter>
-    </ErrorBoundary>
   );
 }
 
@@ -724,7 +688,7 @@ function BillingTab({ user, status }: { user: User, status: string }) {
                     <DollarSign className="w-8 h-8" />
                   </div>
                   <a 
-                    href="https://www.mercadopago.com.br/subscriptions/checkout?preapproval_plan_id=a4da506e02ad4f77acc5f6923621f904" 
+                    href={`https://www.mercadopago.com.br/subscriptions/checkout?preapproval_plan_id=82a1d4268641460eb1ae6fe780b65ae1&external_reference=${user?.uid}`} 
                     target="_blank"
                     rel="noreferrer"
                     className="w-full text-center px-4 py-3 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors shadow-sm"
