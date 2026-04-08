@@ -902,7 +902,27 @@ function PublicPage() {
   };
 
   if (loading) return <div className="flex h-screen items-center justify-center"><p>Carregando...</p></div>;
-  if (!shopData) return <div className="flex h-screen items-center justify-center"><p>Barbearia não encontrada.</p></div>;
+  if (!shopData) {
+    return (
+      <div className="flex flex-col h-screen items-center justify-center bg-gray-50 px-4 text-center">
+        <div className="bg-white p-8 rounded-2xl shadow-sm border border-gray-200 max-w-md w-full">
+          <div className="w-16 h-16 bg-red-100 text-red-500 rounded-full flex items-center justify-center mx-auto mb-4">
+            <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </div>
+          <h2 className="text-xl font-bold text-gray-900 mb-2">Barbearia não encontrada</h2>
+          <p className="text-gray-600 mb-4">
+            Não conseguimos encontrar nenhuma barbearia com o link:<br/>
+            <strong className="text-gray-900 break-all">{shopId}</strong>
+          </p>
+          <p className="text-sm text-gray-500">
+            Verifique se o link foi digitado corretamente ou se o barbeiro já configurou o endereço.
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   // Calendar logic
   const weekStart = startOfWeek(selectedDate, { weekStartsOn: 0 });
