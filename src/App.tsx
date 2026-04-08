@@ -829,10 +829,17 @@ function PublicPage() {
         // Format the shopId from the URL just in case the user typed spaces or uppercase
         const formattedShopId = shopId.toLowerCase().replace(/[^a-z0-9-]/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '');
         
-        console.log("Fetching shop with ID/slug:", formattedShopId);
-        // First try to find by slug
-        const q = query(collection(db, 'barbershops'), where('slug', '==', formattedShopId));
-        const querySnapshot = await getDocs(q);
+        console.log("Fetching shop with ID/slug:", formattedShopId, "Original:", shopId);
+        
+        // Try to find by the exact slug in the URL first
+        let q = query(collection(db, 'barbershops'), where('slug', '==', shopId));
+        let querySnapshot = await getDocs(q);
+        
+        // If not found, try the formatted version
+        if (querySnapshot.empty && formattedShopId !== shopId) {
+           q = query(collection(db, 'barbershops'), where('slug', '==', formattedShopId));
+           querySnapshot = await getDocs(q);
+        }
         
         console.log("Query by slug empty?", querySnapshot.empty);
         
