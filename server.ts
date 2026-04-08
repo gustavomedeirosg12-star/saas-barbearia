@@ -24,7 +24,7 @@ async function startServer() {
   // ============================================================================
   // AUTENTICAÇÃO DO SERVIDOR (MÁGICA PARA NÃO PRECISAR DO ADMIN SDK)
   // ============================================================================
-  const email = 'webhook@barbersaas.com';
+  const email = 'webhook@clientflow.com';
   const password = 'WebhookSuperSecretPassword123!';
   try {
     await signInWithEmailAndPassword(auth, email, password);

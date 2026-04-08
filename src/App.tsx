@@ -32,7 +32,7 @@ function LandingPage() {
       <header className="flex items-center justify-between p-6 max-w-7xl mx-auto">
         <div className="flex items-center gap-2 text-indigo-600">
           <Scissors className="w-8 h-8" />
-          <span className="text-2xl font-bold text-gray-900">BarberSaaS</span>
+          <span className="text-2xl font-bold text-gray-900">ClientFlow</span>
         </div>
         <button 
           onClick={() => navigate('/dashboard')} 
@@ -122,7 +122,7 @@ function AuthWrapper({ children }: { children: React.ReactNode }) {
           <div className="flex justify-center mb-6 mt-4 text-indigo-600">
             <Scissors className="w-12 h-12" />
           </div>
-          <h1 className="text-2xl font-bold text-gray-900 mb-2">BarberSaaS</h1>
+          <h1 className="text-2xl font-bold text-gray-900 mb-2">ClientFlow</h1>
           <p className="text-gray-600 mb-8">Faça login para gerenciar sua barbearia e seus agendamentos.</p>
           <button 
             onClick={handleLogin}
@@ -240,7 +240,7 @@ function Dashboard({ user }: { user?: User }) {
         <div className="flex items-center justify-between h-16 px-6 border-b border-gray-200 shrink-0">
           <div className="flex items-center gap-2 text-indigo-600">
             <Scissors className="w-6 h-6" />
-            <span className="text-xl font-bold text-gray-900">BarberSaaS</span>
+            <span className="text-xl font-bold text-gray-900">ClientFlow</span>
           </div>
           <button className="lg:hidden" onClick={() => setIsMobileMenuOpen(false)}>
             <X className="w-5 h-5 text-gray-500" />
@@ -302,7 +302,7 @@ function Dashboard({ user }: { user?: User }) {
         <header className="lg:hidden flex items-center justify-between h-16 px-4 bg-white border-b border-gray-200 shrink-0">
           <div className="flex items-center gap-2 text-indigo-600">
             <Scissors className="w-6 h-6" />
-            <span className="text-xl font-bold text-gray-900">BarberSaaS</span>
+            <span className="text-xl font-bold text-gray-900">ClientFlow</span>
           </div>
           <button onClick={() => setIsMobileMenuOpen(true)}>
             <Menu className="w-6 h-6 text-gray-600" />
@@ -561,7 +561,10 @@ function SettingsTab({ user, shopName, setShopName, shopDescription, setShopDesc
               <input 
                 type="text" 
                 value={slug} 
-                onChange={e => setSlug(e.target.value)} 
+                onChange={e => {
+                  const val = e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '-').replace(/-+/g, '-');
+                  setSlug(val);
+                }} 
                 placeholder="barbearia-do-ze"
                 className="flex-1 border border-gray-300 rounded-r-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 outline-none" 
               />
@@ -754,7 +757,7 @@ function BillingTab({ user, status }: { user: User, status: string }) {
                   Como o sistema está em fase de lançamento, a liberação pode levar alguns minutos. Se demorar ou se você tiver qualquer dúvida, chame o suporte direto no WhatsApp.
                 </p>
                 <a 
-                  href="https://wa.me/5534992425286?text=Ol%C3%A1%20Gustavo,%20fiz%20o%20pagamento%20do%20BarberSaaS%20e%20preciso%20de%20ajuda." 
+                  href="https://wa.me/5534992425286?text=Ol%C3%A1%20Gustavo,%20fiz%20o%20pagamento%20do%20ClientFlow%20e%20preciso%20de%20ajuda." 
                   target="_blank" 
                   rel="noreferrer"
                   className="inline-flex items-center gap-2 px-4 py-2 bg-green-600 text-white text-sm font-medium rounded-lg hover:bg-green-700 transition-colors"

@@ -8,7 +8,7 @@ async function createPlan() {
       'Content-Type': 'application/json'
     },
     body: JSON.stringify({
-      reason: "Plano Pro - BarberSaaS",
+      reason: "Plano Pro - ClientFlow",
       auto_recurring: {
         frequency: 1,
         frequency_type: "months",

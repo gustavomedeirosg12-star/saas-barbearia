@@ -38,7 +38,7 @@ service cloud.firestore {
     }
 
     function isServer() {
-      return isAuthenticated() && request.auth.token.email == 'webhook@barbersaas.com';
+      return isAuthenticated() && request.auth.token.email == 'webhook@clientflow.com';
     }
 
     function isOwner(userId) {
