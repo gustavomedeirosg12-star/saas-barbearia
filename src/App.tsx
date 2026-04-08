@@ -1,6 +1,6 @@
 import React, { useState, useEffect, Component, ErrorInfo } from 'react';
 import { BrowserRouter, Routes, Route, useParams, useNavigate, Link } from 'react-router-dom';
-import { LayoutDashboard, Globe, Menu, X, Scissors, Plus, Trash2, Calendar as CalendarIcon, Check, LogOut, LogIn, Save, DollarSign, MessageSquare, CreditCard, BookOpen, QrCode, AlertCircle, ChevronLeft, ChevronRight } from 'lucide-react';
+import { LayoutDashboard, Globe, Menu, X, Scissors, Plus, Trash2, Calendar as CalendarIcon, Check, LogOut, LogIn, Save, DollarSign, MessageSquare, CreditCard, BookOpen, QrCode, AlertCircle, ChevronLeft, ChevronRight, ShieldCheck } from 'lucide-react';
 import { format, addDays, startOfWeek, endOfWeek, eachDayOfInterval, isSameDay, isBefore, startOfDay, parseISO, differenceInDays } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { QRCodeSVG } from 'qrcode.react';
@@ -148,10 +148,13 @@ function Dashboard({ user }: { user?: User }) {
   const [shopName, setShopName] = useState("Minha Barbearia");
   const [shopDescription, setShopDescription] = useState("A melhor experiência para o homem moderno.");
   const [primaryColor, setPrimaryColor] = useState("#4f46e5");
+  const [logoUrl, setLogoUrl] = useState("");
+  const [bannerUrl, setBannerUrl] = useState("");
+  const [slug, setSlug] = useState("");
   const [services, setServices] = useState<any[]>([]);
   const [appointments, setAppointments] = useState<any[]>([]);
   const [isSaving, setIsSaving] = useState(false);
-  const [subscriptionStatus, setSubscriptionStatus] = useState('trial'); // 'trial', 'active', 'expired'
+  const [subscriptionStatus, setSubscriptionStatus] = useState('pending'); // 'pending', 'active'
 
   useEffect(() => {
     if (!user) return;
@@ -162,21 +165,23 @@ function Dashboard({ user }: { user?: User }) {
         setShopName(data.shopName || "Minha Barbearia");
         setShopDescription(data.shopDescription || "");
         setPrimaryColor(data.primaryColor || "#4f46e5");
+        setLogoUrl(data.logoUrl || "");
+        setBannerUrl(data.bannerUrl || "");
+        setSlug(data.slug || user.uid);
         setServices(data.services || []);
         
         // Subscription Logic
-        const status = data.subscriptionStatus || 'trial';
+        let status = data.subscriptionStatus || 'pending';
+        
+        // Simulate active account for testing
+        if (user.email === 'gustavo.medeiros.12@gmail.com' || user.email === 'gustavomedeirosg12@gmail.com') {
+          status = 'active';
+        }
+        
         setSubscriptionStatus(status);
         
-        // If trial, check if expired
-        if (status === 'trial') {
-          const creationTime = user?.metadata?.creationTime ? new Date(user.metadata.creationTime) : new Date();
-          const expirationDate = addDays(creationTime, 7);
-          const daysLeft = differenceInDays(expirationDate, new Date());
-          if (daysLeft < 0) {
-            setSubscriptionStatus('expired');
-            setActiveTab('billing'); // Force them to billing tab
-          }
+        if (status !== 'active') {
+          setActiveTab('billing'); // Force them to billing tab
         }
       } else {
         const defaultServices = [
@@ -189,7 +194,7 @@ function Dashboard({ user }: { user?: User }) {
           shopDescription: "A melhor experiência para o homem moderno.",
           primaryColor: "#4f46e5",
           services: defaultServices,
-          subscriptionStatus: 'trial'
+          subscriptionStatus: 'pending'
         });
         setServices(defaultServices);
       }
@@ -214,7 +219,7 @@ function Dashboard({ user }: { user?: User }) {
 
   const handleLogout = () => signOut(auth);
 
-  const isLocked = subscriptionStatus === 'expired';
+  const isLocked = subscriptionStatus !== 'active';
 
   const menuItems = [
     { id: 'schedule', label: 'Agenda', icon: CalendarIcon, disabled: isLocked },
@@ -271,7 +276,7 @@ function Dashboard({ user }: { user?: User }) {
               <Globe className="w-5 h-5 text-indigo-500" />
               <div className="flex flex-col text-left">
                 <span className="text-sm font-bold text-gray-900">Sua Página Pública</span>
-                <span className="text-xs text-gray-500 font-normal">Link para o Instagram</span>
+                <span className="text-xs text-gray-500 font-normal">Link de Agendamento</span>
               </div>
             </Link>
           </div>
@@ -314,6 +319,9 @@ function Dashboard({ user }: { user?: User }) {
               shopName={shopName} setShopName={setShopName}
               shopDescription={shopDescription} setShopDescription={setShopDescription}
               primaryColor={primaryColor} setPrimaryColor={setPrimaryColor}
+              logoUrl={logoUrl} setLogoUrl={setLogoUrl}
+              bannerUrl={bannerUrl} setBannerUrl={setBannerUrl}
+              slug={slug} setSlug={setSlug}
               services={services} setServices={setServices}
             />
           )}
@@ -479,14 +487,18 @@ function WhatsAppTab() {
   );
 }
 
-function SettingsTab({ user, shopName, setShopName, shopDescription, setShopDescription, primaryColor, setPrimaryColor, services, setServices }: any) {
+function SettingsTab({ user, shopName, setShopName, shopDescription, setShopDescription, primaryColor, setPrimaryColor, logoUrl, setLogoUrl, bannerUrl, setBannerUrl, slug, setSlug, services, setServices }: any) {
   const [isSaving, setIsSaving] = useState(false);
   const [newService, setNewService] = useState({ name: '', desc: '', price: '', time: '' });
 
   const handleSave = async () => {
     setIsSaving(true);
     try {
-      await setDoc(doc(db, 'barbershops', user.uid), { shopName, shopDescription, primaryColor, services }, { merge: true });
+      // Basic slug formatting: lowercase, no spaces, no special chars
+      const formattedSlug = slug.toLowerCase().replace(/[^a-z0-9-]/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '');
+      setSlug(formattedSlug || user.uid);
+      
+      await setDoc(doc(db, 'barbershops', user.uid), { shopName, shopDescription, primaryColor, logoUrl, bannerUrl, slug: formattedSlug || user.uid, services }, { merge: true });
       alert("Configurações salvas!");
     } catch (error) {
       alert("Erro ao salvar.");
@@ -522,12 +534,12 @@ function SettingsTab({ user, shopName, setShopName, shopDescription, setShopDesc
         <div className="flex flex-col sm:flex-row gap-2">
           <input 
             readOnly 
-            value={`${window.location.origin}/${user.uid}`} 
+            value={`${window.location.origin}/${slug || user.uid}`} 
             className="flex-1 border border-indigo-200 rounded-lg px-4 py-3 bg-white text-gray-700 font-medium outline-none" 
           />
           <button 
             onClick={() => {
-              navigator.clipboard.writeText(`${window.location.origin}/${user.uid}`);
+              navigator.clipboard.writeText(`${window.location.origin}/${slug || user.uid}`);
               alert("Link copiado! Agora é só colar no seu Instagram.");
             }}
             className="px-6 py-3 bg-indigo-600 text-white font-medium rounded-lg hover:bg-indigo-700 transition-colors whitespace-nowrap"
@@ -541,12 +553,38 @@ function SettingsTab({ user, shopName, setShopName, shopDescription, setShopDesc
         <h2 className="text-lg font-semibold text-gray-900 mb-4">Informações Básicas</h2>
         <div className="space-y-4">
           <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Link Personalizado (Slug)</label>
+            <div className="flex items-center">
+              <span className="bg-gray-100 border border-r-0 border-gray-300 rounded-l-lg px-3 py-2 text-gray-500 text-sm">
+                clientflowsistema.vercel.app/
+              </span>
+              <input 
+                type="text" 
+                value={slug} 
+                onChange={e => setSlug(e.target.value)} 
+                placeholder="barbearia-do-ze"
+                className="flex-1 border border-gray-300 rounded-r-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 outline-none" 
+              />
+            </div>
+            <p className="text-xs text-gray-500 mt-1">Escolha um nome curto e sem espaços para o seu link ficar mais bonito.</p>
+          </div>
+          <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Nome do Estabelecimento</label>
             <input type="text" value={shopName} onChange={e => setShopName(e.target.value)} className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 outline-none" />
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Descrição Curta</label>
             <textarea value={shopDescription} onChange={e => setShopDescription(e.target.value)} className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 outline-none" rows={2} />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Link da Foto/Logo da Barbearia (Opcional)</label>
+            <input type="url" placeholder="https://exemplo.com/minha-foto.jpg" value={logoUrl} onChange={e => setLogoUrl(e.target.value)} className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 outline-none" />
+            <p className="text-xs text-gray-500 mt-1">Cole o link de uma imagem (ex: do seu Instagram ou Google Drive).</p>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Link da Imagem de Fundo / Banner (Opcional)</label>
+            <input type="url" placeholder="https://exemplo.com/meu-banner.jpg" value={bannerUrl} onChange={e => setBannerUrl(e.target.value)} className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 outline-none" />
+            <p className="text-xs text-gray-500 mt-1">Cole o link de uma imagem retangular para o topo da sua página.</p>
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Cor Principal</label>
@@ -596,12 +634,6 @@ function BillingTab({ user, status }: { user: User, status: string }) {
     alert("Chave Pix copiada com sucesso!");
   };
 
-  // Calculate Trial
-  const creationTime = user?.metadata?.creationTime ? new Date(user.metadata.creationTime) : new Date();
-  const expirationDate = addDays(creationTime, 7);
-  const daysLeft = differenceInDays(expirationDate, new Date());
-  
-  const isExpired = status === 'expired';
   const isActive = status === 'active';
 
   return (
@@ -610,17 +642,15 @@ function BillingTab({ user, status }: { user: User, status: string }) {
       
       {/* Status Banner */}
       {!isActive && (
-        <div className={`p-4 rounded-xl border ${isExpired ? 'bg-red-50 border-red-200' : 'bg-blue-50 border-blue-200'}`}>
+        <div className="p-4 rounded-xl border bg-yellow-50 border-yellow-200">
           <div className="flex items-start gap-3">
-            <AlertCircle className={`w-5 h-5 mt-0.5 ${isExpired ? 'text-red-600' : 'text-blue-600'}`} />
+            <AlertCircle className="w-5 h-5 mt-0.5 text-yellow-600" />
             <div>
-              <h3 className={`font-bold ${isExpired ? 'text-red-900' : 'text-blue-900'}`}>
-                {isExpired ? 'Seu período de teste expirou ou seu acesso está bloqueado' : 'Período de Teste Gratuito'}
+              <h3 className="font-bold text-yellow-900">
+                Acesso Restrito
               </h3>
-              <p className={`text-sm mt-1 ${isExpired ? 'text-red-700' : 'text-blue-700'}`}>
-                {isExpired 
-                  ? 'Realize o pagamento abaixo para liberar o sistema e continuar recebendo agendamentos.' 
-                  : `Você tem ${daysLeft > 0 ? daysLeft : 0} dia(s) restante(s) no seu período de teste gratuito.`}
+              <p className="text-sm mt-1 text-yellow-800">
+                Realize o pagamento da sua assinatura abaixo para liberar o sistema e começar a receber agendamentos.
               </p>
             </div>
           </div>
@@ -666,12 +696,21 @@ function BillingTab({ user, status }: { user: User, status: string }) {
                 <div className="mt-auto bg-white p-3 border border-gray-300 rounded-lg text-center">
                   <p className="text-xs text-gray-500 uppercase tracking-wider font-semibold mb-1">Chave Pix</p>
                   <p className="text-sm font-bold text-gray-900 truncate">{pixKey}</p>
+                  <p className="text-xs text-gray-500 mt-1">Gustavo Enrique Targino De Medeiros</p>
                   <button 
                     onClick={handleCopyPix}
-                    className="w-full mt-2 px-4 py-2 bg-gray-900 text-white text-sm font-medium rounded-lg hover:bg-gray-800 transition-colors"
+                    className="w-full mt-3 px-4 py-2 bg-gray-900 text-white text-sm font-medium rounded-lg hover:bg-gray-800 transition-colors"
                   >
                     Copiar Chave
                   </button>
+                  <a 
+                    href={`https://wa.me/5534992425286?text=Ol%C3%A1%20Gustavo,%20j%C3%A1%20paguei%20com%20Pix%20e%20meu%20email%20%C3%A9%20${user?.email}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="w-full mt-2 block px-4 py-2 bg-green-600 text-white text-sm font-medium rounded-lg hover:bg-green-700 transition-colors"
+                  >
+                    Já paguei com Pix
+                  </a>
                 </div>
               </div>
 
@@ -684,16 +723,20 @@ function BillingTab({ user, status }: { user: User, status: string }) {
                   Pague com Cartão de Crédito, Boleto ou Pix através do Mercado Pago.
                 </p>
                 
-                <div className="mt-auto flex flex-col items-center justify-center space-y-3">
-                  <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center text-blue-600 mb-2">
-                    <DollarSign className="w-8 h-8" />
+                <div className="flex-1 flex items-center justify-center mb-6">
+                  <div className="w-32 h-32 bg-white rounded-2xl border border-blue-100 shadow-sm flex items-center justify-center text-blue-500">
+                    <ShieldCheck className="w-16 h-16" />
                   </div>
+                </div>
+                
+                <div className="mt-auto">
                   <a 
                     href={`https://www.mercadopago.com.br/subscriptions/checkout?preapproval_plan_id=82a1d4268641460eb1ae6fe780b65ae1&external_reference=${user?.uid}`} 
                     target="_blank"
                     rel="noreferrer"
-                    className="w-full text-center px-4 py-3 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors shadow-sm"
+                    className="w-full text-center px-4 py-3 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors shadow-sm flex items-center justify-center gap-2"
                   >
+                    <DollarSign className="w-4 h-4" />
                     Pagar com Mercado Pago
                   </a>
                 </div>
@@ -759,6 +802,7 @@ function PublicPage() {
   const { shopId } = useParams();
   const navigate = useNavigate();
   const [shopData, setShopData] = useState<any>(null);
+  const [actualShopId, setActualShopId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   
   // Booking State
@@ -777,22 +821,41 @@ function PublicPage() {
   useEffect(() => {
     if (!shopId) return;
     
-    // Fetch Shop Data
-    getDoc(doc(db, 'barbershops', shopId)).then(docSnap => {
-      if (docSnap.exists()) {
-        setShopData(docSnap.data());
+    const fetchShop = async () => {
+      try {
+        // First try to find by slug
+        const q = query(collection(db, 'barbershops'), where('slug', '==', shopId));
+        const querySnapshot = await getDocs(q);
+        
+        if (!querySnapshot.empty) {
+          const docSnap = querySnapshot.docs[0];
+          setShopData(docSnap.data());
+          setActualShopId(docSnap.id);
+        } else {
+          // Fallback to finding by UID (for old links)
+          const docSnap = await getDoc(doc(db, 'barbershops', shopId));
+          if (docSnap.exists()) {
+            setShopData(docSnap.data());
+            setActualShopId(docSnap.id);
+          }
+        }
+      } catch (error) {
+        console.error("Error fetching shop:", error);
+      } finally {
+        setLoading(false);
       }
-      setLoading(false);
-    });
+    };
+
+    fetchShop();
   }, [shopId]);
 
   useEffect(() => {
-    if (!shopId) return;
+    if (!actualShopId) return;
     // Fetch appointments for the selected date to block times
     const dateStr = format(selectedDate, 'yyyy-MM-dd');
     const q = query(
       collection(db, 'appointments'), 
-      where('barbershopId', '==', shopId),
+      where('barbershopId', '==', actualShopId),
       where('date', '==', dateStr),
       where('status', '==', 'booked')
     );
@@ -803,14 +866,14 @@ function PublicPage() {
     });
 
     return () => unsub();
-  }, [shopId, selectedDate]);
+  }, [actualShopId, selectedDate]);
 
   const handleBook = async () => {
-    if (!selectedService || !selectedTime || !clientName || !clientPhone) return;
+    if (!selectedService || !selectedTime || !clientName || !clientPhone || !actualShopId) return;
     
     try {
       const docRef = await addDoc(collection(db, 'appointments'), {
-        barbershopId: shopId,
+        barbershopId: actualShopId,
         clientName,
         clientPhone,
         service: selectedService.name,
@@ -839,14 +902,14 @@ function PublicPage() {
     <div className="min-h-screen bg-gray-50 pb-20">
       {/* Banner */}
       <div className="h-48 w-full bg-gray-800 relative">
-        <img src="https://images.unsplash.com/photo-1585747860715-2ba37e788b70?auto=format&fit=crop&w=1200&q=80" alt="Banner" className="w-full h-full object-cover opacity-60" referrerPolicy="no-referrer" />
+        <img src={shopData.bannerUrl || "https://images.unsplash.com/photo-1585747860715-2ba37e788b70?auto=format&fit=crop&w=1200&q=80"} alt="Banner" className="w-full h-full object-cover opacity-60" referrerPolicy="no-referrer" />
       </div>
 
       <div className="max-w-2xl mx-auto px-4 sm:px-6 -mt-16 relative z-10">
         {/* Profile Info */}
         <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6 mb-6 text-center">
           <div className="w-24 h-24 mx-auto bg-white rounded-full border-4 border-white shadow-sm overflow-hidden -mt-16 mb-4">
-            <img src="https://images.unsplash.com/photo-1599305090598-fe179d501227?auto=format&fit=crop&w=200&q=80" alt="Logo" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+            <img src={shopData.logoUrl || "https://images.unsplash.com/photo-1599305090598-fe179d501227?auto=format&fit=crop&w=200&q=80"} alt="Logo" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
           </div>
           <h1 className="text-2xl font-bold text-gray-900">{shopData.shopName}</h1>
           <p className="text-gray-600 mt-2 text-sm">{shopData.shopDescription}</p>
@@ -860,7 +923,8 @@ function PublicPage() {
               <div 
                 key={service.id} 
                 onClick={() => setSelectedService(service)}
-                className={`p-4 rounded-xl border cursor-pointer transition-all ${selectedService?.id === service.id ? 'border-indigo-600 bg-indigo-50 ring-1 ring-indigo-600' : 'border-gray-200 hover:border-gray-300'}`}
+                style={selectedService?.id === service.id ? { borderColor: shopData.primaryColor || '#4f46e5', backgroundColor: `${shopData.primaryColor || '#4f46e5'}10` } : {}}
+                className={`p-4 rounded-xl border cursor-pointer transition-all ${selectedService?.id === service.id ? 'ring-1' : 'border-gray-200 hover:border-gray-300'}`}
               >
                 <div className="flex justify-between items-center">
                   <div>
@@ -895,7 +959,8 @@ function PublicPage() {
                     key={day.toISOString()}
                     disabled={isPast}
                     onClick={() => { setSelectedDate(day); setSelectedTime(null); }}
-                    className={`flex flex-col items-center p-2 rounded-lg transition-colors ${isPast ? 'opacity-30 cursor-not-allowed' : isSelected ? 'bg-indigo-600 text-white' : 'hover:bg-gray-100'}`}
+                    style={isSelected && !isPast ? { backgroundColor: shopData.primaryColor || '#4f46e5', color: 'white' } : {}}
+                    className={`flex flex-col items-center p-2 rounded-lg transition-colors ${isPast ? 'opacity-30 cursor-not-allowed' : isSelected ? '' : 'hover:bg-gray-100'}`}
                   >
                     <span className="text-xs mb-1">{format(day, 'EEE', { locale: ptBR }).substring(0, 3)}</span>
                     <span className="font-bold">{format(day, 'd')}</span>
@@ -914,7 +979,8 @@ function PublicPage() {
                     key={time}
                     disabled={isBooked}
                     onClick={() => setSelectedTime(time)}
-                    className={`py-2 px-1 rounded-lg text-sm font-medium transition-all ${isBooked ? 'bg-gray-100 text-gray-400 cursor-not-allowed line-through' : isSelected ? 'bg-indigo-600 text-white shadow-md' : 'bg-white border border-gray-200 text-gray-700 hover:border-indigo-600'}`}
+                    style={isSelected && !isBooked ? { backgroundColor: shopData.primaryColor || '#4f46e5', color: 'white', borderColor: shopData.primaryColor || '#4f46e5' } : {}}
+                    className={`py-2 px-1 rounded-lg text-sm font-medium transition-all ${isBooked ? 'bg-gray-100 text-gray-400 cursor-not-allowed line-through' : isSelected ? 'shadow-md' : 'bg-white border border-gray-200 text-gray-700 hover:border-gray-300'}`}
                   >
                     {time}
                   </button>
