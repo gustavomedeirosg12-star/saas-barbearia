@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, Component, ErrorInfo } from 'react';
 import { BrowserRouter, Routes, Route, useParams, useNavigate, Link } from 'react-router-dom';
 import { LayoutDashboard, Globe, Menu, X, Scissors, Plus, Trash2, Calendar as CalendarIcon, Check, LogOut, LogIn, Save, DollarSign, MessageSquare, CreditCard, BookOpen, QrCode, AlertCircle, ChevronLeft, ChevronRight } from 'lucide-react';
 import { format, addDays, startOfWeek, endOfWeek, eachDayOfInterval, isSameDay, isBefore, startOfDay, parseISO, differenceInDays } from 'date-fns';
@@ -8,16 +8,53 @@ import { auth, db } from './firebase';
 import { signInWithPopup, GoogleAuthProvider, signOut, onAuthStateChanged, User } from 'firebase/auth';
 import { doc, setDoc, getDoc, onSnapshot, collection, query, where, addDoc, updateDoc, serverTimestamp } from 'firebase/firestore';
 
+// --- ERROR BOUNDARY ---
+class ErrorBoundary extends Component<{ children: React.ReactNode }, { hasError: boolean, error: Error | null }> {
+  constructor(props: { children: React.ReactNode }) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+
+  static getDerivedStateFromError(error: Error) {
+    return { hasError: true, error };
+  }
+
+  componentDidCatch(error: Error, errorInfo: ErrorInfo) {
+    console.error("ErrorBoundary caught an error", error, errorInfo);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="min-h-screen flex items-center justify-center bg-gray-50 p-4">
+          <div className="bg-white p-8 rounded-2xl shadow-sm border border-red-200 max-w-md w-full text-center">
+            <AlertCircle className="w-12 h-12 text-red-500 mx-auto mb-4" />
+            <h1 className="text-xl font-bold text-gray-900 mb-2">Ops! Algo deu errado.</h1>
+            <p className="text-gray-600 mb-6 text-sm">Ocorreu um erro inesperado no aplicativo. Tente recarregar a página.</p>
+            <button onClick={() => window.location.reload()} className="px-6 py-3 bg-red-600 text-white font-medium rounded-xl hover:bg-red-700 transition-colors">
+              Recarregar Página
+            </button>
+          </div>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
 // --- MAIN APP COMPONENT ---
 export default function App() {
   return (
-    <BrowserRouter>
-      <Routes>
-        <Route path="/" element={<LandingPage />} />
-        <Route path="/dashboard" element={<AuthWrapper><Dashboard /></AuthWrapper>} />
-        <Route path="/:shopId" element={<PublicPage />} />
-      </Routes>
-    </BrowserRouter>
+    <ErrorBoundary>
+      <BrowserRouter>
+        <Routes>
+          <Route path="/" element={<LandingPage />} />
+          <Route path="/dashboard" element={<AuthWrapper><Dashboard /></AuthWrapper>} />
+          <Route path="/:shopId" element={<PublicPage />} />
+          <Route path="/agendamento/:appointmentId" element={<ClientAppointmentPage />} />
+        </Routes>
+      </BrowserRouter>
+    </ErrorBoundary>
   );
 }
 
@@ -149,6 +186,7 @@ function Dashboard({ user }: { user?: User }) {
   const [services, setServices] = useState<any[]>([]);
   const [appointments, setAppointments] = useState<any[]>([]);
   const [isSaving, setIsSaving] = useState(false);
+  const [subscriptionStatus, setSubscriptionStatus] = useState('trial'); // 'trial', 'active', 'expired'
 
   useEffect(() => {
     if (!user) return;
@@ -160,13 +198,35 @@ function Dashboard({ user }: { user?: User }) {
         setShopDescription(data.shopDescription || "");
         setPrimaryColor(data.primaryColor || "#4f46e5");
         setServices(data.services || []);
+        
+        // Subscription Logic
+        const status = data.subscriptionStatus || 'trial';
+        setSubscriptionStatus(status);
+        
+        // If trial, check if expired
+        if (status === 'trial') {
+          const creationTime = user?.metadata?.creationTime ? new Date(user.metadata.creationTime) : new Date();
+          const expirationDate = addDays(creationTime, 7);
+          const daysLeft = differenceInDays(expirationDate, new Date());
+          if (daysLeft < 0) {
+            setSubscriptionStatus('expired');
+            setActiveTab('billing'); // Force them to billing tab
+          }
+        }
       } else {
+        const defaultServices = [
+          { id: 1, name: 'Corte Degradê', desc: 'Corte na máquina e tesoura com disfarce', price: 35, time: '45 min' },
+          { id: 2, name: 'Barba Terapia', desc: 'Barba com toalha quente e navalha', price: 25, time: '30 min' },
+          { id: 3, name: 'Corte + Barba', desc: 'Pacote completo com desconto', price: 55, time: '1h 15 min' }
+        ];
         setDoc(doc(db, 'barbershops', user.uid), {
           shopName: "Minha Barbearia",
           shopDescription: "A melhor experiência para o homem moderno.",
           primaryColor: "#4f46e5",
-          services: []
+          services: defaultServices,
+          subscriptionStatus: 'trial'
         });
+        setServices(defaultServices);
       }
     });
 
@@ -189,13 +249,15 @@ function Dashboard({ user }: { user?: User }) {
 
   const handleLogout = () => signOut(auth);
 
+  const isLocked = subscriptionStatus === 'expired';
+
   const menuItems = [
-    { id: 'schedule', label: 'Agenda', icon: CalendarIcon },
-    { id: 'financial', label: 'Financeiro', icon: DollarSign },
-    { id: 'whatsapp', label: 'WhatsApp', icon: MessageSquare },
-    { id: 'settings', label: 'Configurações', icon: LayoutDashboard },
-    { id: 'billing', label: 'Assinatura', icon: CreditCard },
-    { id: 'tutorial', label: 'Ajuda / Tutorial', icon: BookOpen },
+    { id: 'schedule', label: 'Agenda', icon: CalendarIcon, disabled: isLocked },
+    { id: 'financial', label: 'Financeiro', icon: DollarSign, disabled: isLocked },
+    { id: 'whatsapp', label: 'WhatsApp', icon: MessageSquare, disabled: isLocked },
+    { id: 'settings', label: 'Configurações', icon: LayoutDashboard, disabled: isLocked },
+    { id: 'billing', label: 'Assinatura', icon: CreditCard, disabled: false },
+    { id: 'tutorial', label: 'Ajuda / Tutorial', icon: BookOpen, disabled: isLocked },
   ];
 
   return (
@@ -222,22 +284,30 @@ function Dashboard({ user }: { user?: User }) {
             return (
               <button
                 key={item.id}
-                onClick={() => { setActiveTab(item.id); setIsMobileMenuOpen(false); }}
-                className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-colors ${isActive ? 'bg-indigo-50 text-indigo-700' : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'}`}
+                disabled={item.disabled}
+                onClick={() => { if(!item.disabled) { setActiveTab(item.id); setIsMobileMenuOpen(false); } }}
+                className={`w-full flex items-center justify-between px-4 py-3 rounded-lg text-sm font-medium transition-colors ${isActive ? 'bg-indigo-50 text-indigo-700' : item.disabled ? 'text-gray-400 opacity-50 cursor-not-allowed' : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'}`}
               >
-                <Icon className={`w-5 h-5 ${isActive ? 'text-indigo-700' : 'text-gray-400'}`} />
-                {item.label}
+                <div className="flex items-center gap-3">
+                  <Icon className={`w-5 h-5 ${isActive ? 'text-indigo-700' : 'text-gray-400'}`} />
+                  {item.label}
+                </div>
+                {item.disabled && <AlertCircle className="w-4 h-4 text-red-400" />}
               </button>
             );
           })}
           <div className="pt-4 mt-4 border-t border-gray-100">
+            <p className="px-4 text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Link para Clientes</p>
             <Link 
               to={`/${user?.uid}`} 
               target="_blank"
-              className="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium text-gray-600 hover:bg-gray-50 hover:text-gray-900 transition-colors"
+              className="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium text-gray-600 hover:bg-indigo-50 hover:text-indigo-700 transition-colors border border-transparent hover:border-indigo-100"
             >
-              <Globe className="w-5 h-5 text-gray-400" />
-              Ver Página Pública
+              <Globe className="w-5 h-5 text-indigo-500" />
+              <div className="flex flex-col text-left">
+                <span className="text-sm font-bold text-gray-900">Sua Página Pública</span>
+                <span className="text-xs text-gray-500 font-normal">Link para o Instagram</span>
+              </div>
             </Link>
           </div>
         </nav>
@@ -282,7 +352,7 @@ function Dashboard({ user }: { user?: User }) {
               services={services} setServices={setServices}
             />
           )}
-          {activeTab === 'billing' && <BillingTab user={user!} />}
+          {activeTab === 'billing' && <BillingTab user={user!} status={subscriptionStatus} />}
           {activeTab === 'tutorial' && <TutorialTab />}
         </div>
       </main>
@@ -475,6 +545,32 @@ function SettingsTab({ user, shopName, setShopName, shopDescription, setShopDesc
           <Save className="w-4 h-4" /> {isSaving ? 'Salvando...' : 'Salvar'}
         </button>
       </div>
+
+      {/* Link Share Section */}
+      <div className="bg-indigo-50 rounded-xl border border-indigo-100 p-6">
+        <h2 className="text-lg font-bold text-indigo-900 mb-2 flex items-center gap-2">
+          <Globe className="w-5 h-5" /> Seu Link de Agendamento
+        </h2>
+        <p className="text-sm text-indigo-700 mb-4">
+          Copie o link abaixo e coloque na <strong>Bio do seu Instagram</strong> ou envie no WhatsApp para seus clientes agendarem sozinhos.
+        </p>
+        <div className="flex flex-col sm:flex-row gap-2">
+          <input 
+            readOnly 
+            value={`${window.location.origin}/${user.uid}`} 
+            className="flex-1 border border-indigo-200 rounded-lg px-4 py-3 bg-white text-gray-700 font-medium outline-none" 
+          />
+          <button 
+            onClick={() => {
+              navigator.clipboard.writeText(`${window.location.origin}/${user.uid}`);
+              alert("Link copiado! Agora é só colar no seu Instagram.");
+            }}
+            className="px-6 py-3 bg-indigo-600 text-white font-medium rounded-lg hover:bg-indigo-700 transition-colors whitespace-nowrap"
+          >
+            Copiar Link
+          </button>
+        </div>
+      </div>
       
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
         <h2 className="text-lg font-semibold text-gray-900 mb-4">Informações Básicas</h2>
@@ -526,7 +622,7 @@ function SettingsTab({ user, shopName, setShopName, shopDescription, setShopDesc
   );
 }
 
-function BillingTab({ user }: { user: User }) {
+function BillingTab({ user, status }: { user: User, status: string }) {
   const pixKey = "02172219630";
   const pixName = "Gustavo Enrique Targino de Medeiros";
 
@@ -535,10 +631,37 @@ function BillingTab({ user }: { user: User }) {
     alert("Chave Pix copiada com sucesso!");
   };
 
+  // Calculate Trial
+  const creationTime = user?.metadata?.creationTime ? new Date(user.metadata.creationTime) : new Date();
+  const expirationDate = addDays(creationTime, 7);
+  const daysLeft = differenceInDays(expirationDate, new Date());
+  
+  const isExpired = status === 'expired';
+  const isActive = status === 'active';
+
   return (
     <div className="max-w-4xl mx-auto space-y-6">
       <h1 className="text-2xl font-bold text-gray-900 mb-6">Assinatura do Sistema</h1>
       
+      {/* Status Banner */}
+      {!isActive && (
+        <div className={`p-4 rounded-xl border ${isExpired ? 'bg-red-50 border-red-200' : 'bg-blue-50 border-blue-200'}`}>
+          <div className="flex items-start gap-3">
+            <AlertCircle className={`w-5 h-5 mt-0.5 ${isExpired ? 'text-red-600' : 'text-blue-600'}`} />
+            <div>
+              <h3 className={`font-bold ${isExpired ? 'text-red-900' : 'text-blue-900'}`}>
+                {isExpired ? 'Seu período de teste expirou ou seu acesso está bloqueado' : 'Período de Teste Gratuito'}
+              </h3>
+              <p className={`text-sm mt-1 ${isExpired ? 'text-red-700' : 'text-blue-700'}`}>
+                {isExpired 
+                  ? 'Realize o pagamento abaixo para liberar o sistema e continuar recebendo agendamentos.' 
+                  : `Você tem ${daysLeft > 0 ? daysLeft : 0} dia(s) restante(s) no seu período de teste gratuito.`}
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
         <div className="p-6 border-b border-gray-200 bg-indigo-50/50">
           <div className="flex items-center justify-between">
@@ -547,38 +670,93 @@ function BillingTab({ user }: { user: User }) {
               <p className="text-gray-600 mt-1">Acesso completo ao sistema e WhatsApp</p>
             </div>
             <div className="text-right">
-              <p className="text-3xl font-bold text-indigo-600">R$ 49,90<span className="text-sm text-gray-500 font-normal">/mês</span></p>
-              <span className="inline-block mt-2 px-3 py-1 bg-yellow-100 text-yellow-700 text-xs font-bold rounded-full">Aguardando Pagamento</span>
+              <p className="text-3xl font-bold text-indigo-600">R$ 49,00<span className="text-sm text-gray-500 font-normal">/mês</span></p>
+              {isActive ? (
+                <span className="inline-block mt-2 px-3 py-1 bg-green-100 text-green-700 text-xs font-bold rounded-full">Ativo</span>
+              ) : (
+                <span className="inline-block mt-2 px-3 py-1 bg-yellow-100 text-yellow-700 text-xs font-bold rounded-full">Aguardando Pagamento</span>
+              )}
             </div>
           </div>
         </div>
-        <div className="p-6">
-          <h3 className="font-medium text-gray-900 mb-4">Como pagar sua assinatura</h3>
-          
-          <div className="bg-gray-50 p-5 rounded-xl border border-gray-200 mb-6">
-            <p className="text-sm text-gray-600 mb-4">
-              Para liberar o acesso ao sistema, realize um Pix no valor de <strong>R$ 49,90</strong> utilizando a chave abaixo. Após o pagamento, o sistema será liberado automaticamente (ou envie o comprovante para o suporte).
-            </p>
+        
+        {!isActive && (
+          <div className="p-6">
+            <h3 className="font-medium text-gray-900 mb-4">Como pagar sua assinatura</h3>
             
-            <div className="flex flex-col sm:flex-row items-center justify-between bg-white p-4 border border-gray-300 rounded-lg gap-4">
-              <div className="flex-1 text-center sm:text-left">
-                <p className="text-xs text-gray-500 uppercase tracking-wider font-semibold mb-1">Chave Pix</p>
-                <p className="text-lg font-bold text-gray-900">{pixKey}</p>
-                <p className="text-sm text-gray-500">{pixName}</p>
+            <div className="grid md:grid-cols-2 gap-6 mb-6">
+              {/* PIX MANUAL */}
+              <div className="bg-gray-50 p-5 rounded-xl border border-gray-200 flex flex-col">
+                <h4 className="font-bold text-gray-900 mb-2 text-center">Opção 1: Pix Direto</h4>
+                <p className="text-sm text-gray-600 mb-4 text-center">
+                  Escaneie o QR Code ou copie a chave.
+                </p>
+                
+                <div className="flex justify-center mb-4">
+                  <div className="p-3 bg-white rounded-xl border border-gray-200 shadow-sm">
+                    <QRCodeSVG value="00020101021126580014br.gov.bcb.pix013602172219630520400005303986540549.905802BR5925Gustavo Enrique Targino d6009Sao Paulo62070503***63041D3D" size={140} />
+                  </div>
+                </div>
+
+                <div className="mt-auto bg-white p-3 border border-gray-300 rounded-lg text-center">
+                  <p className="text-xs text-gray-500 uppercase tracking-wider font-semibold mb-1">Chave Pix</p>
+                  <p className="text-sm font-bold text-gray-900 truncate">{pixKey}</p>
+                  <button 
+                    onClick={handleCopyPix}
+                    className="w-full mt-2 px-4 py-2 bg-gray-900 text-white text-sm font-medium rounded-lg hover:bg-gray-800 transition-colors"
+                  >
+                    Copiar Chave
+                  </button>
+                </div>
               </div>
-              <button 
-                onClick={handleCopyPix}
-                className="w-full sm:w-auto px-6 py-3 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 transition-colors shadow-sm"
-              >
-                Copiar Chave Pix
-              </button>
+
+              {/* MERCADO PAGO */}
+              <div className="bg-blue-50 p-5 rounded-xl border border-blue-200 flex flex-col">
+                <h4 className="font-bold text-blue-900 mb-2 text-center flex items-center justify-center gap-2">
+                  <CreditCard className="w-5 h-5" /> Opção 2: Mercado Pago
+                </h4>
+                <p className="text-sm text-blue-800 mb-6 text-center">
+                  Pague com Cartão de Crédito, Boleto ou Pix através do Mercado Pago.
+                </p>
+                
+                <div className="mt-auto flex flex-col items-center justify-center space-y-3">
+                  <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center text-blue-600 mb-2">
+                    <DollarSign className="w-8 h-8" />
+                  </div>
+                  <a 
+                    href="https://www.mercadopago.com.br/subscriptions/checkout?preapproval_plan_id=a4da506e02ad4f77acc5f6923621f904" 
+                    target="_blank"
+                    rel="noreferrer"
+                    className="w-full text-center px-4 py-3 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors shadow-sm"
+                  >
+                    Pagar com Mercado Pago
+                  </a>
+                </div>
+              </div>
+            </div>
+
+            {/* SUPORTE WHATSAPP */}
+            <div className="bg-green-50 p-5 rounded-xl border border-green-200 flex items-start gap-4">
+              <div className="bg-green-100 p-2 rounded-full shrink-0">
+                <MessageSquare className="w-6 h-6 text-green-600" />
+              </div>
+              <div>
+                <h4 className="font-bold text-green-900">Pagou e não liberou? Ou teve algum problema?</h4>
+                <p className="text-sm text-green-800 mt-1 mb-3">
+                  Como o sistema está em fase de lançamento, a liberação pode levar alguns minutos. Se demorar ou se você tiver qualquer dúvida, chame o suporte direto no WhatsApp.
+                </p>
+                <a 
+                  href="https://wa.me/5534992425286?text=Ol%C3%A1%20Gustavo,%20fiz%20o%20pagamento%20do%20BarberSaaS%20e%20preciso%20de%20ajuda." 
+                  target="_blank" 
+                  rel="noreferrer"
+                  className="inline-flex items-center gap-2 px-4 py-2 bg-green-600 text-white text-sm font-medium rounded-lg hover:bg-green-700 transition-colors"
+                >
+                  Falar com Suporte (WhatsApp)
+                </a>
+              </div>
             </div>
           </div>
-
-          <p className="text-sm text-gray-500 flex items-center gap-2">
-            <AlertCircle className="w-4 h-4" /> Seu acesso será bloqueado caso o pagamento não seja identificado.
-          </p>
-        </div>
+        )}
       </div>
     </div>
   );
@@ -614,6 +792,7 @@ function TutorialTab() {
 // --- PUBLIC BOOKING PAGE COMPONENT ---
 function PublicPage() {
   const { shopId } = useParams();
+  const navigate = useNavigate();
   const [shopData, setShopData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   
@@ -665,7 +844,7 @@ function PublicPage() {
     if (!selectedService || !selectedTime || !clientName || !clientPhone) return;
     
     try {
-      await addDoc(collection(db, 'appointments'), {
+      const docRef = await addDoc(collection(db, 'appointments'), {
         barbershopId: shopId,
         clientName,
         clientPhone,
@@ -677,11 +856,7 @@ function PublicPage() {
         confirmed: false,
         createdAt: serverTimestamp()
       });
-      alert("Agendamento realizado com sucesso! O barbeiro foi notificado.");
-      setSelectedTime(null);
-      setClientName('');
-      setClientPhone('');
-      setSelectedService(null);
+      navigate(`/agendamento/${docRef.id}`);
     } catch (error) {
       alert("Erro ao agendar. Tente novamente.");
     }
@@ -820,6 +995,113 @@ function PublicPage() {
             </div>
           </div>
         )}
+      </div>
+    </div>
+  );
+}
+
+// --- CLIENT APPOINTMENT PAGE ---
+function ClientAppointmentPage() {
+  const { appointmentId } = useParams();
+  const [appointment, setAppointment] = useState<any>(null);
+  const [shopData, setShopData] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (!appointmentId) return;
+
+    const unsub = onSnapshot(doc(db, 'appointments', appointmentId), async (docSnap) => {
+      if (docSnap.exists()) {
+        const aptData = docSnap.data();
+        setAppointment(aptData);
+        
+        // Fetch shop data
+        const shopSnap = await getDoc(doc(db, 'barbershops', aptData.barbershopId));
+        if (shopSnap.exists()) {
+          setShopData(shopSnap.data());
+        }
+      }
+      setLoading(false);
+    });
+
+    return () => unsub();
+  }, [appointmentId]);
+
+  const handleCancel = async () => {
+    if (window.confirm("Tem certeza que deseja cancelar este agendamento?")) {
+      try {
+        await updateDoc(doc(db, 'appointments', appointmentId!), { status: 'cancelled' });
+        alert("Agendamento cancelado com sucesso.");
+      } catch (error) {
+        alert("Erro ao cancelar.");
+      }
+    }
+  };
+
+  if (loading) return <div className="flex h-screen items-center justify-center"><p>Carregando...</p></div>;
+  if (!appointment) return <div className="flex h-screen items-center justify-center"><p>Agendamento não encontrado.</p></div>;
+
+  const isCancelled = appointment.status === 'cancelled';
+
+  return (
+    <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+      <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-8 max-w-md w-full text-center">
+        <div className={`w-16 h-16 mx-auto rounded-full flex items-center justify-center mb-6 ${isCancelled ? 'bg-red-100 text-red-600' : 'bg-green-100 text-green-600'}`}>
+          {isCancelled ? <X className="w-8 h-8" /> : <Check className="w-8 h-8" />}
+        </div>
+        
+        <h1 className="text-2xl font-bold text-gray-900 mb-2">
+          {isCancelled ? 'Agendamento Cancelado' : 'Agendamento Confirmado!'}
+        </h1>
+        <p className="text-gray-600 mb-8">
+          {isCancelled 
+            ? 'Este horário foi liberado na agenda.' 
+            : 'Guarde este link. Você pode usá-lo para consultar ou cancelar seu horário.'}
+        </p>
+
+        <div className="bg-gray-50 rounded-xl p-6 text-left space-y-4 mb-8 border border-gray-100">
+          <div>
+            <p className="text-xs text-gray-500 uppercase tracking-wider font-semibold">Barbearia</p>
+            <p className="font-medium text-gray-900">{shopData?.shopName || 'Carregando...'}</p>
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <p className="text-xs text-gray-500 uppercase tracking-wider font-semibold">Data</p>
+              <p className="font-medium text-gray-900">{appointment.date.split('-').reverse().join('/')}</p>
+            </div>
+            <div>
+              <p className="text-xs text-gray-500 uppercase tracking-wider font-semibold">Horário</p>
+              <p className="font-medium text-gray-900">{appointment.time}</p>
+            </div>
+          </div>
+          <div>
+            <p className="text-xs text-gray-500 uppercase tracking-wider font-semibold">Serviço</p>
+            <p className="font-medium text-gray-900">{appointment.service}</p>
+          </div>
+          <div>
+            <p className="text-xs text-gray-500 uppercase tracking-wider font-semibold">Cliente</p>
+            <p className="font-medium text-gray-900">{appointment.clientName}</p>
+          </div>
+        </div>
+
+        {!isCancelled && (
+          <button 
+            onClick={handleCancel}
+            className="w-full py-3 text-red-600 font-medium hover:bg-red-50 rounded-xl transition-colors"
+          >
+            Cancelar Agendamento
+          </button>
+        )}
+        
+        <button 
+          onClick={() => {
+            navigator.clipboard.writeText(window.location.href);
+            alert("Link copiado!");
+          }}
+          className="w-full mt-2 py-3 text-indigo-600 font-medium hover:bg-indigo-50 rounded-xl transition-colors"
+        >
+          Copiar Link deste Agendamento
+        </button>
       </div>
     </div>
   );

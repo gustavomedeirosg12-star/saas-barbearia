@@ -108,8 +108,9 @@ service cloud.firestore {
       // Anyone can create an appointment (public booking)
       allow create: if isValidAppointment();
       
-      // Only the barbershop owner can update or delete appointments
-      allow update: if isAuthenticated() && request.auth.uid == resource.data.barbershopId && isValidAppointment() && request.resource.data.barbershopId == resource.data.barbershopId;
+      // Only the barbershop owner can update or delete appointments, OR a client can cancel their own appointment if they have the ID
+      allow update: if (isAuthenticated() && request.auth.uid == resource.data.barbershopId && isValidAppointment() && request.resource.data.barbershopId == resource.data.barbershopId) ||
+                       (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status']) && request.resource.data.status == 'cancelled');
       allow delete: if isAuthenticated() && request.auth.uid == resource.data.barbershopId;
     }
   }
