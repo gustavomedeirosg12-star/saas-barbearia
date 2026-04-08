@@ -1,0 +1,116 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ===============================================================
+    // Assumed Data Model
+    // ===============================================================
+    //
+    // Collection: barbershops
+    // Document ID: {userId}
+    // Fields:
+    //   - shopName: string (required, max 100 chars)
+    //   - shopDescription: string (optional, max 500 chars)
+    //   - primaryColor: string (optional, max 20 chars)
+    //   - services: list of objects (optional, max 50 items)
+    //
+    // Collection: appointments
+    // Document ID: {appointmentId}
+    // Fields:
+    //   - barbershopId: string (required, must match a valid barbershop)
+    //   - clientName: string (required, max 100 chars)
+    //   - service: string (required, max 100 chars)
+    //   - time: string (required, max 10 chars)
+    //   - date: string (required, YYYY-MM-DD)
+    //   - status: string (required, 'booked' or 'cancelled')
+    //   - confirmed: boolean (optional)
+    //   - createdAt: timestamp (required)
+    //
+    // ===============================================================
+
+    // ===============================================================
+    // Helper Functions
+    // ===============================================================
+
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    function hasRequiredFields(fields) {
+      return request.resource.data.keys().hasAll(fields);
+    }
+
+    function validStringLength(field, minLen, maxLen) {
+      return request.resource.data[field] is string &&
+        request.resource.data[field].size() >= minLen &&
+        request.resource.data[field].size() <= maxLen;
+    }
+
+    function isValidOptionalString(field, minLen, maxLen) {
+      return !(field in request.resource.data) ||
+             (request.resource.data[field] is string &&
+              request.resource.data[field].size() >= minLen &&
+              request.resource.data[field].size() <= maxLen);
+    }
+
+    function isValidList(listField, maxSize) {
+      return !(listField in request.resource.data) || 
+             (request.resource.data[listField] is list && request.resource.data[listField].size() <= maxSize);
+    }
+
+    // ===============================================================
+    // Domain Validators
+    // ===============================================================
+
+    function isValidBarbershop() {
+      return hasRequiredFields(['shopName']) &&
+             validStringLength('shopName', 1, 100) &&
+             isValidOptionalString('shopDescription', 0, 500) &&
+             isValidOptionalString('primaryColor', 0, 20) &&
+             isValidList('services', 50);
+    }
+
+    function isValidAppointment() {
+      return hasRequiredFields(['barbershopId', 'clientName', 'clientPhone', 'service', 'time', 'date', 'status', 'createdAt']) &&
+             validStringLength('barbershopId', 1, 100) &&
+             validStringLength('clientName', 1, 100) &&
+             validStringLength('clientPhone', 8, 20) &&
+             validStringLength('service', 1, 100) &&
+             validStringLength('time', 1, 10) &&
+             validStringLength('date', 10, 10) &&
+             (request.resource.data.status == 'booked' || request.resource.data.status == 'cancelled') &&
+             request.resource.data.createdAt is timestamp;
+    }
+
+    // ===============================================================
+    // Rules
+    // ===============================================================
+
+    match /barbershops/{userId} {
+      // Anyone can read a barbershop's public profile
+      allow read: if true;
+      
+      // Only the owner can create or update their barbershop profile
+      allow create: if isOwner(userId) && isValidBarbershop();
+      allow update: if isOwner(userId) && isValidBarbershop();
+    }
+
+    match /appointments/{appointmentId} {
+      // Anyone can read appointments to check availability (needed for the public calendar)
+      // In a production app, we would restrict this to only return time/date, but Firestore doesn't support field-level read rules easily for lists.
+      allow read: if true;
+      
+      // Anyone can create an appointment (public booking)
+      allow create: if isValidAppointment();
+      
+      // Only the barbershop owner can update or delete appointments
+      allow update: if isAuthenticated() && request.auth.uid == resource.data.barbershopId && isValidAppointment() && request.resource.data.barbershopId == resource.data.barbershopId;
+      allow delete: if isAuthenticated() && request.auth.uid == resource.data.barbershopId;
+    }
+  }
+}

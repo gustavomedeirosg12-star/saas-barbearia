@@ -1,0 +1,57 @@
+{
+  "entities": {
+    "Barbershop": {
+      "title": "Barbershop Settings",
+      "description": "Settings and public profile for a barbershop",
+      "type": "object",
+      "properties": {
+        "shopName": { "type": "string", "description": "Name of the barbershop" },
+        "shopDescription": { "type": "string", "description": "Short description of the barbershop" },
+        "primaryColor": { "type": "string", "description": "Hex color code for the primary theme color" },
+        "services": {
+          "type": "array",
+          "description": "List of services offered",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": { "type": "number" },
+              "name": { "type": "string" },
+              "desc": { "type": "string" },
+              "price": { "type": "number" },
+              "time": { "type": "string" }
+            },
+            "required": ["id", "name", "price"]
+          }
+        }
+      },
+      "required": ["shopName"]
+    },
+    "Appointment": {
+      "title": "Appointment",
+      "description": "A booking made by a client",
+      "type": "object",
+      "properties": {
+        "barbershopId": { "type": "string", "description": "The UID of the barbershop owner" },
+        "clientName": { "type": "string", "description": "Name of the client" },
+        "clientPhone": { "type": "string", "description": "WhatsApp number of the client" },
+        "service": { "type": "string", "description": "Name of the service booked" },
+        "time": { "type": "string", "description": "Time of the appointment (e.g., '14:00')" },
+        "date": { "type": "string", "description": "Date of the appointment (YYYY-MM-DD)" },
+        "status": { "type": "string", "enum": ["booked", "free", "cancelled"], "description": "Status of the appointment" },
+        "confirmed": { "type": "boolean", "description": "Whether the barber has confirmed the appointment" },
+        "createdAt": { "type": "timestamp", "description": "When the appointment was created" }
+      },
+      "required": ["barbershopId", "clientName", "clientPhone", "service", "time", "date", "status", "createdAt"]
+    }
+  },
+  "firestore": {
+    "/barbershops/{userId}": {
+      "schema": { "$ref": "#/entities/Barbershop" },
+      "description": "Stores the settings for each barbershop, keyed by the owner's UID."
+    },
+    "/appointments/{appointmentId}": {
+      "schema": { "$ref": "#/entities/Appointment" },
+      "description": "Stores all appointments across all barbershops."
+    }
+  }
+}
