@@ -800,6 +800,34 @@ function TutorialTab() {
   );
 }
 
+// --- DEBUG COMPONENT ---
+function DebugSlugsList() {
+  const [slugs, setSlugs] = useState<string[]>([]);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const fetchAllSlugs = async () => {
+      try {
+        const querySnapshot = await getDocs(collection(db, 'barbershops'));
+        const allSlugs = querySnapshot.docs.map(doc => doc.data().slug || doc.id);
+        setSlugs(allSlugs);
+      } catch (err: any) {
+        setError(err.message);
+      }
+    };
+    fetchAllSlugs();
+  }, []);
+
+  if (error) return <p className="text-red-500">Erro: {error}</p>;
+  if (slugs.length === 0) return <p>Nenhuma barbearia no banco.</p>;
+  
+  return (
+    <ul className="list-disc pl-4">
+      {slugs.map((s, i) => <li key={i}>{s}</li>)}
+    </ul>
+  );
+}
+
 // --- PUBLIC BOOKING PAGE COMPONENT ---
 function PublicPage() {
   const { shopId } = useParams();
@@ -923,9 +951,15 @@ function PublicPage() {
             Não conseguimos encontrar nenhuma barbearia com o link:<br/>
             <strong className="text-gray-900 break-all">{shopId}</strong>
           </p>
-          <p className="text-sm text-gray-500">
+          <p className="text-sm text-gray-500 mb-4">
             Verifique se o link foi digitado corretamente ou se o barbeiro já configurou o endereço.
           </p>
+          
+          {/* DEBUG INFO - REMOVE LATER */}
+          <div className="mt-6 p-4 bg-gray-100 rounded-lg text-left text-xs overflow-auto max-h-40">
+            <p className="font-bold text-gray-700 mb-2">Debug Info (Slugs no Banco):</p>
+            <DebugSlugsList />
+          </div>
         </div>
       </div>
     );
