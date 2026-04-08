@@ -269,7 +269,7 @@ function Dashboard({ user }: { user?: User }) {
           <div className="pt-4 mt-4 border-t border-gray-100">
             <p className="px-4 text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Link para Clientes</p>
             <Link 
-              to={`/${user?.uid}`} 
+              to={`/${slug || user?.uid}`} 
               target="_blank"
               className="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium text-gray-600 hover:bg-indigo-50 hover:text-indigo-700 transition-colors border border-transparent hover:border-indigo-100"
             >
@@ -826,17 +826,25 @@ function PublicPage() {
     
     const fetchShop = async () => {
       try {
+        // Format the shopId from the URL just in case the user typed spaces or uppercase
+        const formattedShopId = shopId.toLowerCase().replace(/[^a-z0-9-]/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '');
+        
+        console.log("Fetching shop with ID/slug:", formattedShopId);
         // First try to find by slug
-        const q = query(collection(db, 'barbershops'), where('slug', '==', shopId));
+        const q = query(collection(db, 'barbershops'), where('slug', '==', formattedShopId));
         const querySnapshot = await getDocs(q);
+        
+        console.log("Query by slug empty?", querySnapshot.empty);
         
         if (!querySnapshot.empty) {
           const docSnap = querySnapshot.docs[0];
+          console.log("Found by slug:", docSnap.data());
           setShopData(docSnap.data());
           setActualShopId(docSnap.id);
         } else {
           // Fallback to finding by UID (for old links)
           const docSnap = await getDoc(doc(db, 'barbershops', shopId));
+          console.log("Fallback by UID exists?", docSnap.exists());
           if (docSnap.exists()) {
             setShopData(docSnap.data());
             setActualShopId(docSnap.id);
